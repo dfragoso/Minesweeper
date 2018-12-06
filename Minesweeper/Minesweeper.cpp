@@ -8,66 +8,74 @@
 
 mt19937 random_mt;
 
+unsigned int mineCount = 50;
+
 int Random(int min, int max)
 {
 	uniform_int_distribution<int> dist(min, max);
 	return dist(random_mt);
 }
 void CreateMines(Tile** &gameBoard) {
-	unsigned int mineCount = 50;
+	
 	unsigned int x = 0;
 	unsigned int y = 0;
-	while (mineCount > 0) {
+	for (unsigned int i = 0; i < mineCount; i++) {
 		x = Random(0, 24);
 		y = Random(0, 15);
 		gameBoard[x][y].isMine = true;
-		mineCount--;
 	}
 }
-//void RevealMines(Tile** &gameBoard, sf::RenderWindow &board) {
-//	for (unsigned int y = 0; y < 512; y++) {
-//		for (unsigned int x = 0; x < 800; x++) {
-//			if (gameBoard[x / 32][y / 32].isMine) {
-//				board.draw(gameBoard[x / 32][y / 32].reavealedTile);
-//				board.draw(gameBoard[x / 32][y / 32].mine);
-//			}
-//		}
-//	}
-//}
-void Cascade(Tile** &gameBoard, unsigned int x, unsigned int y, sf::RenderWindow &board) {
-	if (x == 0 && y == 0) {
-		gameBoard[x][y].right = &gameBoard[x + 1][y];
-		gameBoard[x][y].bottomright = &gameBoard[x + 1][y + 1];
-		gameBoard[x][y].bottom = &gameBoard[x][y + 1];
 
-	}
-	else if (x == 25 && y == 0) {
-		gameBoard[x][y].left = &gameBoard[x - 1][y];
-		gameBoard[x][y].bottomLeft = &gameBoard[x - 1][y + 1];
-		gameBoard[x][y].bottom = &gameBoard[x][y + 1];
-	}
-	else if (x == 0 && y == 16) {
-		gameBoard[x][y].top = &gameBoard[x][y - 1];
-		gameBoard[x][y].topRight = &gameBoard[x + 1][y - 1];
-		gameBoard[x][y].right = &gameBoard[x + 1][y];
-	}
-	else if (x == 25 && y == 16) {
-		gameBoard[x][y].top = &gameBoard[x][y - 1];
-		gameBoard[x][y].topleft = &gameBoard[x - 1][y - 1];
-		gameBoard[x][y].left = &gameBoard[x - 1][y];
-	}
-	else if (x == 0 && y != 0) {
-		gameBoard[x][y].top = &gameBoard[x][y - 1];
-		gameBoard[x][y].topRight = &gameBoard[x + 1][y - 1];
+void InitTileNeighbors(Tile** &gameBoard) {
+	for (unsigned int y = 0; y < 16; y++) {
+		for (unsigned int x = 0; x < 25; x++) {
+			Tile tile = gameBoard[x][y];
+			int back = x - 1;
+			int forward = x + 1;
+			int up = y - 1;
+			int down = y + 1;
 
-	}
-	else if (x == 25 && y != 0) {
-		gameBoard[x][y].top = &gameBoard[x][y - 1];
-		gameBoard[x][y].topleft = &gameBoard[x - 1][y - 1];
-	}
-	else if (x == 25 && y != 16) {
+			if (back >= 0) {
+				gameBoard[x][y].neighbors.push_back(&gameBoard[back][y]);
+				if (up >= 0) {
+					gameBoard[x][y].neighbors.push_back(&gameBoard[x][up]);
+					gameBoard[x][y].neighbors.push_back(&gameBoard[back][up]);
+				}
 
+				if (down < 16) {
+					gameBoard[x][y].neighbors.push_back(&gameBoard[back][down]);
+				}
+			}
+
+			if (forward < 25) {
+				gameBoard[x][y].neighbors.push_back(&gameBoard[forward][y]);
+				if (down < 16) {
+					gameBoard[x][y].neighbors.push_back(&gameBoard[x][down]);
+					gameBoard[x][y].neighbors.push_back(&gameBoard[forward][down]);
+				}
+				if (up >= 0) {
+					gameBoard[x][y].neighbors.push_back(&gameBoard[forward][up]);
+				}
+
+			}
+		}
 	}
+}
+
+void Cascade(Tile &tile ) {
+	tile.isClicked = true;
+
+	for (unsigned int i = 0; i < tile.neighbors.size(); i++) {
+		if (!tile.neighbors[i]->isMine) {
+			Cascade(*tile.neighbors[i]);
+		}
+		else {
+			tile.mineCount++;
+		}
+	}
+	
+
+
 }
 
 void LoadingTextures(string imageName, unordered_map<string, sf::Texture> &textures) {
@@ -79,67 +87,125 @@ void LoadingTextures(string imageName, unordered_map<string, sf::Texture> &textu
 }
 
 
-// TODO: put lose face
-void GameOver(Tile** &gameBoard, sf::RenderWindow &board, unordered_map<string, sf::Texture> &textures) {
-	for (unsigned int y = 0; y < 16; y++) {
-		for (unsigned int x = 0; x < 25; x++) {
 
-			if (gameBoard[x][y].isMine) {
-				gameBoard[x][y].background.setTexture(textures["tile_revealed"]);
-				gameBoard[x][y].layer.setTexture(textures["mine"]);
-			}
-
-		}
-	}
-}
-
-void LeftClickEvent(Tile** &gameBoard, Tile &tile, unordered_map<string, sf::Texture> &textures, sf::RenderWindow &board) {
+bool LeftClickEvent( Tile &tile) {
 	if (!tile.isClicked) {
 		if (tile.isMine) {
-			GameOver(gameBoard, board, textures);
-			return;
+			
+			return true;
 		}
-		tile.background.setTexture(textures["tile_revealed"]);
+		Cascade(tile);
 	}
+	return false;
 }
 
-void DrawBoard(Tile** &gameBoard, unordered_map<string, sf::Texture> &textures, sf::RenderWindow &board) {
+void DrawBoard(Tile** &gameBoard, unordered_map<string, sf::Texture> &textures, sf::RenderWindow &board, bool gameOver, bool debug, sf::Sprite &face) {
+	
+
+	if (gameOver) {
+		face.setTexture(textures["face_lose"]);
+		board.draw(face);
+	}
+	else {
+		face.setTexture(textures["face_happy"]);
+		board.draw(face);
+	}
+
 	for (unsigned int y = 0; y < 16; y++) {
 			for (unsigned int x = 0; x < 25; x++) {
-	
-				if (gameBoard[x][y].isClicked) {
-					gameBoard[x][y].background.setTexture(textures["tile_revealed"]);
-					if (gameBoard[x][y].mineCount > 0) {
-						gameBoard[x][y].background.setTexture(textures["number_"+to_string(gameBoard[x][y].mineCount)]);
-					}
-					
-				}
-				else {
-					gameBoard[x][y].background.setTexture(textures["tile_hidden"]);
-					if (gameBoard[x][y].isFlag) {
-						gameBoard[x][y].background.setTexture(textures["flag"]);
-					}
-				}
+				Tile tile = gameBoard[x][y];
 				
-			
-				/*if (gameBoard[x][y].isFlag) {
-					board.draw(gameBoard[x][y].flag);
+				if(tile.isClicked) {
+					tile.background.setTexture(textures["tile_revealed"]);
+					board.draw(tile.background);
+					if (tile.mineCount > 0) {
+						tile.background.setTexture(textures["number_" + to_string(tile.mineCount)]);
+						board.draw(tile.background);
+					}
 
 				}
-				if (gameBoard[x][y].isClicked){
-					if (!gameBoard[x][y].isMine) {
-						board.draw(gameBoard[x][y].reavealedTile);
+				else {
+					tile.background.setTexture(textures["tile_hidden"]);
+					board.draw(tile.background);
+					if (tile.isFlag) {
+						tile.background.setTexture(textures["flag"]);
+						board.draw(tile.background);
 					}
-					else {
-						RevealMines(gameBoard, board);
+				}
+				if (gameOver || debug) {
+					if (tile.isMine) {
+						tile.background.setTexture(textures["tile_revealed"]);
+						board.draw(tile.background);
+						tile.background.setTexture(textures["mine"]);
+						board.draw(tile.background);
+
+						
 					}
-				}*/
+
+				
+				}		
+				
 			}
 		}
+}
+
+void ResetGame(Tile** gameBoard) {
+	for (unsigned int y = 0; y < 16; y++) {
+		for (unsigned int x = 0; x < 25; x++) {
+			sf::Texture texture;
+			Tile tile;
+			tile.background.setPosition(sf::Vector2f(x * 32, y * 32));
+			gameBoard[x][y] = tile;
+
+		}
+	}
+	CreateMines(gameBoard);
+	InitTileNeighbors(gameBoard);
+	mineCount = 50;
+
+}
+
+void DisplayCounter(sf::Sprite &digit_0, sf::Sprite &digit_1, sf::Sprite &digit_2, unordered_map<string, sf::Texture > &textures,sf::RenderWindow &board) {
+	string countValue = to_string(mineCount);
+	string digit0;
+	string digit1;
+	string digit2;
+
+	if (countValue.size() > 2) {
+		digit0.push_back(countValue[0]);
+		digit1.push_back(countValue[1]);
+		digit2.push_back(countValue[2]);
+
+		digit_0.setTexture(textures["digit_" + digit0]);
+		digit_1.setTexture(textures["digit_" + digit1]);
+		digit_2.setTexture(textures["digit_" + digit2]);
+		
+		
+	}
+	else if (countValue.size() == 2) {
+		digit1.push_back(countValue[0]);
+		digit2.push_back(countValue[1]);
+
+		digit_0.setTexture(textures["digit_0"]);
+		digit_1.setTexture(textures["digit_" + digit1]);
+		digit_2.setTexture(textures["digit_" + digit2]);
+	
+	}
+	else if (countValue.size() == 1) {
+		digit2.push_back(countValue[0]);
+
+		digit_0.setTexture(textures["digit_0"]);
+		digit_1.setTexture(textures["digit_0"]);
+		digit_2.setTexture(textures["digit_" + digit2]);
+	}
+
+	board.draw(digit_0);
+	board.draw(digit_1);
+	board.draw(digit_2);
 }
 
 int main()
-{
+{	
 	unordered_map<string, sf::Texture> textures;
 	LoadingTextures("tile_hidden", textures);
 	LoadingTextures("debug", textures);
@@ -165,17 +231,9 @@ int main()
 
 
 	
-	sf::Sprite face_happy;
-	face_happy.setTexture(textures["face_happy"]);
-	face_happy.setPosition(sf::Vector2f(400, 512));
-
-	sf::Sprite face_lose;
-	face_lose.setTexture(textures["face_lose"]);
-	face_lose.setPosition(sf::Vector2f(400, 512));
-
-	sf::Sprite face_win;
-	face_win.setTexture(textures["face_win"]);
-	face_win.setPosition(sf::Vector2f(400, 512));
+	sf::Sprite face;
+	face.setTexture(textures["face_happy"]);
+	face.setPosition(sf::Vector2f(400, 512));
 
 	sf::Sprite test_1;
 	test_1.setTexture(textures["test_1"]);
@@ -190,16 +248,16 @@ int main()
 	debug.setPosition(sf::Vector2f(600, 512));
 
 	sf::Sprite digit_0;
-	sf::Sprite digit_2;
-	sf::Sprite digit_3;
 	sf::Sprite digit_1;
-	sf::Sprite digit_4;
-	sf::Sprite digit_5;
-	sf::Sprite digit_6;
-	sf::Sprite digit_7;
-	sf::Sprite digit_8;
-	sf::Sprite digit_9;
+	sf::Sprite digit_2;
+	digit_0.setTexture(textures["digit_0"]);
+	digit_1.setTexture(textures["digit_5"]);
+	digit_2.setTexture(textures["digit_0"]);
 
+	digit_0.setPosition(sf::Vector2f(0, 512));
+	digit_1.setPosition(sf::Vector2f(21, 512));
+	digit_2.setPosition(sf::Vector2f(42, 512));
+	
 	
 	
 	//vector<vector<Tile*>> gameBoard;
@@ -208,60 +266,68 @@ int main()
 		gameBoard[i] = new Tile[16];
 	}
 
-	for (unsigned int y = 0; y < 16; y++) {
-		for (unsigned int x = 0; x < 25; x++) {
-			sf::Texture texture;
-			Tile tile;
-			tile.background.setTexture(textures["tile_hidden"]);
-			tile.background.setPosition(sf::Vector2f(x * 32, y * 32));
-			tile.layer.setPosition(sf::Vector2f(x * 32, y * 32));
-			/*tile.reavealedTile.setTexture(textures["tile_revealed"]);
-			tile.reavealedTile.setPosition(sf::Vector2f(x * 32, y * 32));
-			tile.flag.setTexture(textures["flag"]);
-			tile.flag.setPosition(sf::Vector2f(x * 32, y * 32));
-			tile.mine.setTexture(textures["mine"]);
-			tile.mine.setPosition(sf::Vector2f(x * 32, y * 32));*/
-			gameBoard[x][y] = tile;
-
-		}
-	}
+	ResetGame(gameBoard);
 	
-	CreateMines(gameBoard);
 	sf::RenderWindow board(sf::VideoMode(800, 600), "Minesweeper");
+	bool gameOver = false;
+	bool debugMode = false;
 	while (board.isOpen())
 	{
 		sf::Event event;
 		board.clear(sf::Color::White);
 		sf::Texture test;
 		
-		
-		DrawBoard(gameBoard, textures,board);
-		
-		board.draw(face_happy);
+		DisplayCounter(digit_0, digit_1, digit_2, textures, board);
 		board.draw(debug);
 		board.draw(test_1);
 		board.draw(test_2);
+
+		DrawBoard(gameBoard, textures, board, gameOver, debugMode, face);
+		
+		
+	
 		
 		while (board.pollEvent(event))
 		{
-			if (event.type == sf::Event::Closed)
+			if (event.type == sf::Event::Closed) {
 				board.close();
+				gameOver = true;
+			}
+				
 			if (event.type == sf::Event::MouseButtonPressed) {
-				if (event.mouseButton.button == sf::Mouse::Right) {
-					if (gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isFlag) {
-						gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isFlag = false;
+				if (!gameOver) {
+					if (event.mouseButton.x >= 0 && event.mouseButton.x <= 800 && event.mouseButton.y >= 0 && event.mouseButton.y <= 512) {
+						if (event.mouseButton.button == sf::Mouse::Right) {
+							if (gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isFlag) {
+								gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isFlag = false;
+								mineCount++;
 
-						//increase the mine count
+								//increase the mine count
+							}
+							else {
+								gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isFlag = true;
+								gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].background.setTexture(textures["flag"]);
+								//Reduce the mineCount
+								mineCount--;
+							}
+						}
+						if (event.mouseButton.button == sf::Mouse::Left) {
+							//gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isClicked = true;
+							gameOver = LeftClickEvent(gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32]);
+
+						}
 					}
-					else {
-						gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isFlag = true;
-						gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].background.setTexture(textures["flag"]);
-						//Reduce the mineCount
-					}					
+
+					if (event.mouseButton.x >= 600 && event.mouseButton.x <= 664 && event.mouseButton.y >= 512 && event.mouseButton.y <= 576) {
+						debugMode = !debugMode;
+					}
 				}
+
 				if (event.mouseButton.button == sf::Mouse::Left) {
-					//gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isClicked = true;
-					LeftClickEvent(gameBoard, gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32], textures, board);
+					if (event.mouseButton.x >= 400 && event.mouseButton.x <= 464 && event.mouseButton.y >= 512 && event.mouseButton.y <= 576) {
+						ResetGame(gameBoard);
+						gameOver = false;
+					}
 					
 				}
 			}

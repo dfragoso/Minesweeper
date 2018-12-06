@@ -2,18 +2,13 @@
 #include <SFML/Graphics.hpp>
 #include <unordered_map>
 #include<string>
+#include <vector>
 using namespace std;
 
 struct Tile
 {
-	Tile* topleft;
-	Tile* top;
-	Tile* topRight;
-	Tile* left;
-	Tile* right;
-	Tile* bottomLeft;
-	Tile* bottom;
-	Tile* bottomright;
+	vector<Tile*> neighbors;
+	
 
 	unsigned int mineCount;
 	bool isMine;
