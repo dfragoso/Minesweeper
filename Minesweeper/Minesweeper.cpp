@@ -9,6 +9,7 @@
 mt19937 random_mt;
 
 unsigned int mineCount = 10;
+unsigned int flagsLeft = mineCount;
 
 int Random(int min, int max)
 {
@@ -175,11 +176,12 @@ void ResetGame(Tile** gameBoard) {
 	CreateMines(gameBoard);
 	InitTileNeighbors(gameBoard);
 	mineCount = 10;
+	flagsLeft = mineCount;
 
 }
 
 void DisplayCounter(sf::Sprite &digit_0, sf::Sprite &digit_1, sf::Sprite &digit_2, unordered_map<string, sf::Texture > &textures,sf::RenderWindow &board) {
-	string countValue = to_string(mineCount);
+	string countValue = to_string(flagsLeft);
 	string digit0;
 	string digit1;
 	string digit2;
@@ -338,15 +340,15 @@ int main()
 						if (event.mouseButton.button == sf::Mouse::Right) {
 							if (gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isFlag) {
 								gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isFlag = false;
-								mineCount++;
+								flagsLeft++;
 
 								//increase the mine count
 							}
 							else {
-								if (mineCount > 0) {
+								if (flagsLeft > 0) {
 									gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isFlag = true;
 									//Reduce the mineCount
-									mineCount--;
+									flagsLeft--;
 								}
 								
 							
