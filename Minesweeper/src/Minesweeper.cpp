@@ -8,7 +8,7 @@
 
 mt19937 random_mt;
 
-unsigned int mineCount = 10;
+unsigned int mineCount = 50;
 
 int Random(int min, int max)
 {
@@ -79,7 +79,7 @@ void Cascade(Tile &tile ) {
 		}
 	}
 	for (unsigned int i = 0; i < tile.neighbors.size(); i++) {
-		if (tile.mineCount == 0 && !tile.neighbors[i]->visited && !tile.neighbors[i]->isMine && !tile.neighbors[i]->isFlag) {
+		if (tile.mineCount == 0 && !tile.neighbors[i]->visited && !tile.neighbors[i]->isMine) {
 			Cascade(*tile.neighbors[i]);
 		}
 	}
@@ -145,7 +145,7 @@ void DrawBoard(Tile** &gameBoard, unordered_map<string, sf::Texture> &textures, 
 						board.draw(tile.background);
 					}
 				}
-				if (gameOver || debug || gameWon) {
+				if (gameOver || debug) {
 					if (tile.isMine) {
 						tile.background.setTexture(textures["tile_revealed"]);
 						board.draw(tile.background);
@@ -174,7 +174,7 @@ void ResetGame(Tile** gameBoard) {
 	}
 	CreateMines(gameBoard);
 	InitTileNeighbors(gameBoard);
-	mineCount = 10;
+	mineCount = 50;
 
 }
 
@@ -219,21 +219,17 @@ void DisplayCounter(sf::Sprite &digit_0, sf::Sprite &digit_1, sf::Sprite &digit_
 
 bool GameWon(Tile** &gameBoard) {
 	unsigned int remaningSpaces = 0;
-	unsigned int mines = 0;
 
 	for (unsigned int y = 0; y < 16; y++) {
 		for (unsigned int x = 0; x < 25; x++) {
 			if (!gameBoard[x][y].isClicked) {
 				remaningSpaces++;
 			}
-			if (gameBoard[x][y].isMine) {
-				mines++;
-			}
 		}
 	}
 
 	
-	if (remaningSpaces == mines) {
+	if (remaningSpaces == mineCount) {
 		return true;
 	}
 	else {
@@ -353,9 +349,8 @@ int main()
 							}
 						}
 						if (event.mouseButton.button == sf::Mouse::Left) {
-							if (!gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isFlag) {
-								gameOver = LeftClickEvent(gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32]);
-							}
+							//gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32].isClicked = true;
+							gameOver = LeftClickEvent(gameBoard[event.mouseButton.x / 32][event.mouseButton.y / 32]);
 
 						}
 						gameWon = GameWon(gameBoard);
